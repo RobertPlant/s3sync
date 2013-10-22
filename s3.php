@@ -2,13 +2,11 @@
 <?php
 
 //Email recipient to send status email to after sync.
-define("MAIL_TO_RECIP", "");
+define("MAIL_TO_RECIP", "robert.plant@warrant-group.com");
 
-//Fall back to the pear package if necessary.
-if( file_exists('s3sdk/sdk.class.php'))
-    require_once('s3sdk/sdk.class.php');
-else
-    require_once 'AWSSDKforPHP/sdk.class.php';
+require('vendor/autoload.php');
+
+use Aws\S3\S3Client;
 
 class S3sync
 {
@@ -27,25 +25,36 @@ class S3sync
     private $isDryRun = FALSE;
     const MAX_FILE_SIZE_IN_BYTES = 4294967296;
 
+    public function getAwsKey () {
+        $config['aws']['key'] = "";
+        $config['aws']['secret'] = "";
+        return $config;
+    }
+
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
-        $this->_s3 = new AmazonS3();
-        $this->_s3->disable_ssl_verification(false);
+        $config = $this->getAwsKey();
+        if ($config['aws']['key'] == "" || $config['aws']['secret'] == "") {
+            echo "you need to include your public S3 key and private S3 key into teh config.php file";
+        }
+        $this->_s3 = S3Client::factory(array(
+            'key'    => $config['aws']['key'],
+            'secret' => $config['aws']['secret']
+        ));
+        $this->_s3->setSslVerification(true);
         $this->_startTime = microtime(true);
         $this->_bucketName = $bucketName;
         $this->_directory = $directory;
         $this->isDryRun = $dryRun;
-        
-        if( empty($bucketName) || empty($directory) )
+
+        if( empty($bucketName) || empty($directory) ) {
             throw new Exception('Missing bucket or directory');
-        else
-        {
+        } else {
             echo "\n\nInitiated sync service with bucket {$this->_bucketName}\n";
         }
 
         $this->loadUsersBuckets();
         $this->checkBucketIsValid();
-
         if($this->isDryRun)
         {
             echo "WARNING: YOU ARE RUNNING IN DRY RUN MODE, NO FILES WILL BE UPLOADED TO S3.\n\n";
@@ -53,10 +62,12 @@ class S3sync
         //Retreive a list of files to be processed
         $this->_fileList = $this->getFileListFromDirectory($this->_directory);
         $totalFileCount = count($this->_fileList);
-        if($this->_fileList === FALSE)
+
+        if($this->_fileList === FALSE) {
             throw new Exception("Unable to get file list from directory.");
-        else
+        } else {
             echo "\n\nTotal number of files found to process $totalFileCount \n";
+        }
     }
 
     public function sync()
@@ -64,10 +75,11 @@ class S3sync
         $this->loadObjectsFromS3Bucket();
 
         echo "Begining to upload....\n\n";
-        foreach($this->_fileList as $fileHash => $fileMeta)
+        foreach($this->_fileList as $fileMeta)
         {
-            if( ! isset($this->_s3Objects[$fileHash]) )
+            if(! isset($this->_s3Objects[ltrim($fileMeta['path'], '/')]))
             {
+                echo "|";
                 $this->uploadFile($fileMeta);
             }
             else
@@ -76,39 +88,32 @@ class S3sync
                 $this->_filesAlreadyUploaded++;
             }
         }
+        echo "\n";
     }
 
     
     public function uploadFile($fileMeta)
     {
-        echo ".";
-
         $fullPath = $fileMeta['path'];
-        $fileHash = $fileMeta['hash'];
         
         if( $this->_filesUploaded % 100 == 0  && $this->_filesUploaded != 0)
             echo "({$this->_filesUploaded} / " . count($this->_fileList) . ") \n";
 
-        $options = array(
-            'fileUpload' => $fullPath,
-            'storage' => AmazonS3::STORAGE_REDUCED,
-            'meta' => array(
-                'path' => $fullPath,
-                'hash' => $fileHash
-            ),
-        );
-
         if(!$this->isDryRun)
         {
-            $response = $this->_s3->create_object($this->_bucketName, $fileHash, $options);
+            $response = $this->_s3->putObject(array(
+                'Bucket' => $this->_bucketName,
+                'Key' => $fullPath,
+                'Body' => fopen($fullPath, 'r')
+            ));
 
-            if( $response->isOK() )
+            if( is_object($response) )
                 $this->_filesUploaded++;
             else
                 $this->_uploadErrors++;
-        }
-        else
+        } else {
             $this->_filesUploaded++;
+        }
     }
 
 
@@ -143,9 +148,9 @@ class S3sync
         if( !isset($this->_userBuckets[$this->_bucketName]) )
         {
             echo "\nUnable to find the bucket specified in your bucket list.  Did you mean one of the following?\n\n";
-            foreach($this->_userBuckets as $k => $v)
+            foreach($this->_userBuckets as $v)
             {
-                echo "\t" . $v . "\n";
+                echo "\t" . $v['Name'] . "\n";
             }
             echo "\n";
             exit;
@@ -155,12 +160,13 @@ class S3sync
 
     public function loadObjectsFromS3Bucket()
     {
-        $response = $this->_s3->get_object_list($this->_bucketName);
         $results = array();
+        $iterator = $this->_s3->getIterator('ListObjects', array(
+            'Bucket' => $this->_bucketName
+        ));
 
-        foreach($response as $fileName)
-        {
-            $results[$fileName] = $fileName;
+        foreach ($iterator->toArray() as $object) {
+            $results[$object['Key']] = $object['Key'];
         }
 
         $this->_s3Objects = $results;
@@ -168,18 +174,15 @@ class S3sync
 
     public function loadUsersBuckets()
     {
-        $results = array();
-        $response = $this->_s3->list_buckets();
+        $response = $this->_s3->listBuckets()->toArray();
 
-        // Success?
-        if(! $response->isOK() )
+        if(! is_array($response['Buckets'])) {
             throw new Exception("Unable to retrieve users buckets");
+        }
 
-        $buckets = $response->body->Buckets->Bucket;
-
-        foreach($buckets as $bucket)
+        foreach($response['Buckets'] as $bucket)
         {
-            $tmpName = (string) $bucket->Name;
+            $tmpName = (string) $bucket['Name'];
             $results[$tmpName] = $tmpName;
         }
 
