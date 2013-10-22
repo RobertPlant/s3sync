@@ -2,7 +2,7 @@
 <?php
 
 //Email recipient to send status email to after sync.
-define("MAIL_TO_RECIP", "robert.plant@warrant-group.com");
+define("MAIL_TO_RECIP", "");
 
 require('vendor/autoload.php');
 
