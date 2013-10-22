@@ -3,4 +3,6 @@ so no complex diffs of data or dual sync is enabled.  However, the script does c
 has already been synced before uploading so it won't kill your bandwidth. I have adapted this script from yellowandy
 to work with the new version of the Amazon SDK. Usage is;
 
+php composer.phar install
+
 s3.php <bucket name> <directory>
