@@ -1,8 +1,4 @@
-#!/usr/bin/php
 <?php
-
-//Email recipient to send status email to after sync.
-define("MAIL_TO_RECIP", "");
 
 require('vendor/autoload.php');
 
@@ -10,6 +6,15 @@ use Aws\S3\S3Client;
 
 class S3sync
 {
+    const MAIL_TO_RECIP = "";
+    const S3_PUBLIC_KEY = "";
+    const S3_PRIVATE_KEY = "";
+    const REMOTE_PATH = "";
+    const MEMORY_LIMIT = "2048M";
+    protected $BLACKLIST = array(
+        'xml', 'txt', 'edi'
+    );
+
     private $_s3;
     private $_startTime;
     private $_bucketName = '';
@@ -24,24 +29,17 @@ class S3sync
     private $_errorMessages = array();
     private $isDryRun = FALSE;
     const MAX_FILE_SIZE_IN_BYTES = 4294967296;
-    protected $_blacklist = array();
     protected $_ignoredFiles;
-    protected $_remotePath;
 
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
-        ini_set('memory_limit', '2048M');
+        ini_set('memory_limit', self::MEMORY_LIMIT);
         $this->_s3 = S3Client::factory(
             array(
-                'key' => "",
-                'secret' => ""
+                'key' => self::S3_PUBLIC_KEY,
+                'secret' => self::S3_PRIVATE_KEY
             )
         );
-        $this->_blacklist = array(
-            'xml', 'txt', 'edi'
-        );
-        $this->_remotePath = '';
-
         $this->_s3->setSslVerification(true);
         $this->_startTime = microtime(true);
         $this->_bucketName = $bucketName;
@@ -59,7 +57,7 @@ class S3sync
         if ($this->isDryRun) {
             echo "WARNING: YOU ARE RUNNING IN DRY RUN MODE, NO FILES WILL BE UPLOADED TO S3.\n\n";
         }
-        //Retreive a list of files to be processed
+
         $this->_fileList = $this->getFileListFromDirectory($this->_directory);
         $totalFileCount = count($this->_fileList) + $this->_ignoredFiles;
 
@@ -77,7 +75,7 @@ class S3sync
         echo "Begining to upload....\n\n";
 
         foreach ($this->_fileList as $fileMeta) {
-            if (!isset($this->_s3Objects[ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/')])) {
+            if (!isset($this->_s3Objects[ltrim(self::REMOTE_PATH, '/') . ltrim($fileMeta['path'], '/')])) {
                 echo "|";
                 $this->uploadFile($fileMeta);
             } else {
@@ -101,7 +99,7 @@ class S3sync
             $response = $this->_s3->putObject(
                 array(
                     'Bucket' => $this->_bucketName,
-                    'Key' => $this->_remotePath . $fullPath,
+                    'Key' => REMOTE_PATH . $fullPath,
                     'Body' => fopen($fullPath, 'r')
                 )
             );
@@ -138,12 +136,11 @@ class S3sync
         $message = implode("\n", $out);
         echo $message;
 
-        mail(MAIL_TO_RECIP, "S3 Sync Results", $message);
+        mail(self::MAIL_TO_RECIP, "S3 Sync Results", $message);
     }
 
     private function checkBucketIsValid()
     {
-        //Make sure user specified a valid bucket.
         if (!isset($this->_userBuckets[$this->_bucketName])) {
             echo "\nUnable to find the bucket specified in your bucket list.  Did you mean one of the following?\n\n";
             foreach ($this->_userBuckets as $v) {
@@ -212,7 +209,7 @@ class S3sync
             } elseif (is_readable("$dir$entry")) {
                 $tFileName = "$dir$entry";
                 $pathInfo = pathinfo($tFileName);
-                if (in_array($pathInfo['extension'], $this->_blacklist)) {
+                if (in_array($pathInfo['extension'], $this->BLACKLIST)) {
                     $this->_ignoredFiles++;
                     continue;
                 }
