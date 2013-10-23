@@ -33,14 +33,14 @@ class S3sync
         ini_set('memory_limit', '2048M');
         $this->_s3 = S3Client::factory(
             array(
-                'key' => "AKIAJ6Z45JOWM6W3DDUA",
-                'secret' => "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"
+                'key' => "",
+                'secret' => ""
             )
         );
         $this->_blacklist = array(
             'xml', 'txt', 'edi'
         );
-        $this->_remotePath = '/data/cache/';
+        $this->_remotePath = '';
 
         $this->_s3->setSslVerification(true);
         $this->_startTime = microtime(true);
