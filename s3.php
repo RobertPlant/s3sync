@@ -99,7 +99,7 @@ class S3sync
             $response = $this->_s3->putObject(
                 array(
                     'Bucket' => $this->_bucketName,
-                    'Key' => REMOTE_PATH . $fullPath,
+                    'Key' => self::REMOTE_PATH . $fullPath,
                     'Body' => fopen($fullPath, 'r')
                 )
             );
@@ -169,6 +169,7 @@ class S3sync
 
     public function loadUsersBuckets()
     {
+        $results = array();
         $response = $this->_s3->listBuckets()->toArray();
 
         if (!is_array($response['Buckets'])) {
