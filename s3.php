@@ -26,6 +26,7 @@ class S3sync
     const MAX_FILE_SIZE_IN_BYTES = 4294967296;
     protected $_blacklist = array();
     protected $_ignoredFiles;
+    protected $_remotePath;
 
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
@@ -38,6 +39,7 @@ class S3sync
         $this->_blacklist = array(
             'xml', 'txt', 'edi'
         );
+        $this->_remotePath = '/data/cache/';
 
         $this->_s3->setSslVerification(true);
         $this->_startTime = microtime(true);
@@ -72,8 +74,9 @@ class S3sync
         $this->loadObjectsFromS3Bucket();
 
         echo "Begining to upload....\n\n";
+
         foreach ($this->_fileList as $fileMeta) {
-            if (!isset($this->_s3Objects[ltrim($fileMeta['path'], '/')])) {
+            if (!isset($this->_s3Objects[ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/')])) {
                 echo "|";
                 $this->uploadFile($fileMeta);
             } else {
@@ -97,7 +100,7 @@ class S3sync
             $response = $this->_s3->putObject(
                 array(
                     'Bucket' => $this->_bucketName,
-                    'Key' => $fullPath,
+                    'Key' => $this->_remotePath . $fullPath,
                     'Body' => fopen($fullPath, 'r')
                 )
             );
