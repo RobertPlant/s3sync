@@ -211,6 +211,10 @@ class S3sync
             } elseif (is_readable("$dir$entry")) {
                 $tFileName = "$dir$entry";
                 $pathInfo = pathinfo($tFileName);
+                if (array_key_exists('extension', $pathInfo)) {
+                    $this->_ignoredFiles++;
+                    continue;
+                }
                 if (in_array($pathInfo['extension'], $this->BLACKLIST)) {
                     $this->_ignoredFiles++;
                     continue;
