@@ -30,6 +30,7 @@ class S3sync
 
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
+        ini_set('memory_limit', '1gb');
         $this->_s3 = S3Client::factory(
             array(
                 'key' => "",
