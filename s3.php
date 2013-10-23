@@ -33,8 +33,8 @@ class S3sync
         ini_set('memory_limit', '2048M');
         $this->_s3 = S3Client::factory(
             array(
-                'key' => "",
-                'secret' => ""
+                'key' => "AKIAJ6Z45JOWM6W3DDUA",
+                'secret' => "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"
             )
         );
         $this->_blacklist = array(
@@ -61,7 +61,7 @@ class S3sync
         }
         //Retreive a list of files to be processed
         $this->_fileList = $this->getFileListFromDirectory($this->_directory);
-        $totalFileCount = count($this->_fileList);
+        $totalFileCount = count($this->_fileList) + $this->_ignoredFiles;
 
         if ($this->_fileList === FALSE) {
             throw new Exception("Unable to get file list from directory.");
@@ -76,9 +76,7 @@ class S3sync
 
         echo "Begining to upload....\n\n";
 
-        var_dump($this->_s3Objects);
         foreach ($this->_fileList as $fileMeta) {
-            var_dump(ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/'));
             if (!isset($this->_s3Objects[ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/')])) {
                 echo "|";
                 $this->uploadFile($fileMeta);
