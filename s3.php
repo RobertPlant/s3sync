@@ -24,26 +24,21 @@ class S3sync
     private $_errorMessages = array();
     private $isDryRun = FALSE;
     const MAX_FILE_SIZE_IN_BYTES = 4294967296;
-
-    public function getAwsKey()
-    {
-        $config['aws']['key'] = "";
-        $config['aws']['secret'] = "";
-        return $config;
-    }
+    protected $_blacklist = array();
+    protected $_ignoredFiles;
 
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
-        $config = $this->getAwsKey();
-        if ($config['aws']['key'] == "" || $config['aws']['secret'] == "") {
-            echo "you need to include your public S3 key and private S3 key into the s3.php file";
-        }
         $this->_s3 = S3Client::factory(
             array(
-                'key' => $config['aws']['key'],
-                'secret' => $config['aws']['secret']
+                'key' => "",
+                'secret' => ""
             )
         );
+        $this->_blacklist = array(
+            'xml', 'txt', 'edi'
+        );
+
         $this->_s3->setSslVerification(true);
         $this->_startTime = microtime(true);
         $this->_bucketName = $bucketName;
@@ -128,6 +123,7 @@ class S3sync
         $out[] = "Total files examined: " . count($this->_fileList) . "\n";
         $out[] = "Total files uploaded to S3: {$this->_filesUploaded}\n";
         $out[] = "Total files ignored (cached in s3): {$this->_filesAlreadyUploaded}\n";
+        $out[] = "Total files ignored file extension blacklist: {$this->_ignoredFiles}\n";
         $out[] = "Total upload errors: {$this->_uploadErrors}\n";
         $out[] = "***********************************************************\n ";
 
@@ -200,7 +196,7 @@ class S3sync
         }
 
         while (false !== ($entry = $d->read())) {
-            // skip hidden files
+
             if ($entry[0] == ".") {
                 continue;
             }
@@ -211,6 +207,11 @@ class S3sync
                 }
             } elseif (is_readable("$dir$entry")) {
                 $tFileName = "$dir$entry";
+                $pathInfo = pathinfo($tFileName);
+                if (in_array($pathInfo['extension'], $this->_blacklist)) {
+                    $this->_ignoredFiles++;
+                    continue;
+                }
                 $hash = md5($tFileName);
                 $size = filesize($tFileName);
                 if ($size > self::MAX_FILE_SIZE_IN_BYTES) {
@@ -229,7 +230,6 @@ class S3sync
         $d->close();
 
         return $retval;
-
     }
 }
 
