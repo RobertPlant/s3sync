@@ -6,33 +6,34 @@ use Aws\S3\S3Client;
 
 class S3sync
 {
+    const MAX_FILE_SIZE_IN_BYTES = 4294967296;
     const MAIL_TO_RECIP = "";
     const S3_PUBLIC_KEY = "";
     const S3_PRIVATE_KEY = "";
     const REMOTE_PATH = "";
     const MEMORY_LIMIT = "2048M";
+
     protected $BLACKLIST = array(
         'xml', 'txt', 'edi'
     );
-
-    private $_s3;
-    private $_startTime;
-    private $_bucketName = '';
-    private $_directory = '';
-    private $_fileList = array();
-    private $_fileHashList = array();
-    private $_userBuckets = array();
-    private $_filesUploaded = 0;
-    private $_filesAlreadyUploaded = 0;
-    private $_uploadErrors = 0;
-    private $_s3Objects = array();
-    private $_errorMessages = array();
-    private $isDryRun = FALSE;
-    const MAX_FILE_SIZE_IN_BYTES = 4294967296;
+    protected $_s3;
+    protected $_startTime;
+    protected $_bucketName = '';
+    protected $_directory = '';
+    protected $_fileList = array();
+    protected $_fileHashList = array();
+    protected $_userBuckets = array();
+    protected $_filesUploaded = 0;
+    protected $_filesAlreadyUploaded = 0;
+    protected $_uploadErrors = 0;
+    protected $_s3Objects = array();
+    protected $_errorMessages = array();
+    protected $isDryRun = FALSE;
     protected $_ignoredFiles;
 
     public function __construct($bucketName, $directory, $dryRun = FALSE)
     {
+        $this->_startTime = microtime(true);
         ini_set('memory_limit', self::MEMORY_LIMIT);
         $this->_s3 = S3Client::factory(
             array(
@@ -41,7 +42,6 @@ class S3sync
             )
         );
         $this->_s3->setSslVerification(true);
-        $this->_startTime = microtime(true);
         $this->_bucketName = $bucketName;
         $this->_directory = $directory;
         $this->isDryRun = $dryRun;
@@ -121,6 +121,7 @@ class S3sync
 
         $out = array();
         $out[] = "************************* RESULTS ***********************\n ";
+        if ($this->isDryRun) { $out[] = "This is a dry run!!, no files uploaded \n"; }
         $out[] = "Total time: $totalTime (s)\n";
         $out[] = "Total files examined: " . (count($this->_fileList) + $this->_ignoredFiles) . "\n";
         $out[] = "Total files uploaded to S3: {$this->_filesUploaded}\n";
