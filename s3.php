@@ -76,7 +76,9 @@ class S3sync
 
         echo "Begining to upload....\n\n";
 
+        var_dump($this->_s3Objects);
         foreach ($this->_fileList as $fileMeta) {
+            var_dump(ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/'));
             if (!isset($this->_s3Objects[ltrim($this->_remotePath, '/') . ltrim($fileMeta['path'], '/')])) {
                 echo "|";
                 $this->uploadFile($fileMeta);
@@ -124,10 +126,10 @@ class S3sync
         $out = array();
         $out[] = "************************* RESULTS ***********************\n ";
         $out[] = "Total time: $totalTime (s)\n";
-        $out[] = "Total files examined: " . count($this->_fileList) . "\n";
+        $out[] = "Total files examined: " . (count($this->_fileList) + $this->_ignoredFiles) . "\n";
         $out[] = "Total files uploaded to S3: {$this->_filesUploaded}\n";
-        $out[] = "Total files ignored (cached in s3): {$this->_filesAlreadyUploaded}\n";
-        $out[] = "Total files ignored file extension blacklist: {$this->_ignoredFiles}\n";
+        $out[] = "Total files ignored (already in s3): {$this->_filesAlreadyUploaded}\n";
+        $out[] = "Total files ignored (file extension blacklist): {$this->_ignoredFiles}\n";
         $out[] = "Total upload errors: {$this->_uploadErrors}\n";
         $out[] = "***********************************************************\n ";
 
